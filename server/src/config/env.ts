@@ -4,29 +4,71 @@ import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
+// Resilient key extractors supporting Render's UI variants (with or without spaces/underscores)
+const resolveEnv = (...keys: string[]): string => {
+  for (const k of keys) {
+    const val = process.env[k];
+    if (val && typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+  }
+  return '';
+};
+
+const geminiKey = resolveEnv(
+  'GEMINI_API_KEY',
+  'GEMINI API KEY',
+  'VITE_GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GEMINI_KEY'
+);
+
+const supabaseUrl = resolveEnv(
+  'SUPABASE_URL',
+  'SUPABASE URL',
+  'VITE_SUPABASE_URL'
+);
+
+const supabaseAnonKey = resolveEnv(
+  'SUPABASE_ANON_KEY',
+  'SUPABASE ANON KEY',
+  'VITE_SUPABASE_ANON_KEY'
+);
+
+const supabaseServiceKey = resolveEnv(
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE SERVICE ROLE KEY',
+  'SUPABASE_SERVICE_KEY'
+);
+
+const geminiModel = resolveEnv(
+  'GEMINI_MODEL',
+  'GEMINI MODEL'
+) || 'gemini-2.5-flash';
+
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || '*',
   supabase: {
-    url: process.env.SUPABASE_URL || '',
-    anonKey: process.env.SUPABASE_ANON_KEY || '',
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+    serviceRoleKey: supabaseServiceKey || supabaseAnonKey,
     isConfigured: Boolean(
-      process.env.SUPABASE_URL &&
-      process.env.SUPABASE_ANON_KEY &&
-      !process.env.SUPABASE_URL.includes('your-project-id') &&
-      !process.env.SUPABASE_ANON_KEY.includes('your-anon-key') &&
-      process.env.SUPABASE_URL.startsWith('https://')
+      supabaseUrl &&
+      supabaseAnonKey &&
+      !supabaseUrl.includes('your-project-id') &&
+      !supabaseAnonKey.includes('your-anon-key') &&
+      supabaseUrl.startsWith('https://')
     )
   },
   ai: {
-    geminiApiKey: process.env.GEMINI_API_KEY || '',
-    modelName: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+    geminiApiKey: geminiKey,
+    modelName: geminiModel,
     isConfigured: Boolean(
-      process.env.GEMINI_API_KEY &&
-      !process.env.GEMINI_API_KEY.includes('your-gemini-key') &&
-      process.env.GEMINI_API_KEY.trim().length > 15
+      geminiKey &&
+      !geminiKey.includes('your-gemini-key') &&
+      geminiKey.length > 15
     )
   }
 };

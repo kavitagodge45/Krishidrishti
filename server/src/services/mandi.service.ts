@@ -33,7 +33,16 @@ export const fetchRealMandiPrices = async (
   stateFilter?: string,
   searchQuery?: string
 ): Promise<MandiFetchResult> => {
-  const apiKey = process.env.DATA_GOV_IN_API_KEY;
+  const apiKey = (
+    process.env.DATA_GOV_IN_API_KEY ||
+    process.env['DATA_GOV_IN_API_KEY'] ||
+    process.env['DATA GOV IN API KEY'] ||
+    process.env['DATA.GOV.IN_API_KEY'] ||
+    process.env.AGMARKNET_API_KEY ||
+    process.env['AGMARKNET API KEY'] ||
+    process.env.VITE_DATA_GOV_IN_API_KEY ||
+    ''
+  ).trim();
 
   if (!apiKey || apiKey.includes('your-data-gov-in-key') || apiKey.trim().length < 10) {
     return {
