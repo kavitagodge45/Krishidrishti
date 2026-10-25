@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+  <defs>
+    <radialGradient id="leafGrad" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#2d6a4f" />
+      <stop offset="70%" stop-color="#1b4332" />
+      <stop offset="100%" stop-color="#081c15" />
+    </radialGradient>
+    <radialGradient id="lesionGrad" cx="40%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#582f0e" />
+      <stop offset="40%" stop-color="#7f4f24" />
+      <stop offset="75%" stop-color="#936639" />
+      <stop offset="100%" stop-color="#ddb892" stop-opacity="0.2" />
+    </radialGradient>
+    <radialGradient id="haloGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e9d8a6" stop-opacity="0.8" />
+      <stop offset="60%" stop-color="#ee9b00" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#2d6a4f" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="800" height="600" fill="#0f172a" />
+
+  <!-- Macro Leaf Contour -->
+  <path d="M 400 60 C 580 140 680 320 620 480 C 560 550 440 540 400 520 C 360 540 240 550 180 480 C 120 320 220 140 400 60 Z" fill="url(#leafGrad)" stroke="#40916c" stroke-width="3" />
+
+  <!-- Leaf Veins -->
+  <path d="M 400 70 L 400 520" stroke="#52b788" stroke-width="4" stroke-linecap="round" opacity="0.6" />
+  <path d="M 400 160 Q 480 200 560 210" stroke="#52b788" stroke-width="2.5" fill="none" opacity="0.5" />
+  <path d="M 400 230 Q 500 280 580 300" stroke="#52b788" stroke-width="2.5" fill="none" opacity="0.5" />
+  <path d="M 400 320 Q 500 370 560 410" stroke="#52b788" stroke-width="2" fill="none" opacity="0.5" />
+  <path d="M 400 160 Q 320 200 240 210" stroke="#52b788" stroke-width="2.5" fill="none" opacity="0.5" />
+  <path d="M 400 230 Q 300 280 220 300" stroke="#52b788" stroke-width="2.5" fill="none" opacity="0.5" />
+  <path d="M 400 320 Q 300 370 240 410" stroke="#52b788" stroke-width="2" fill="none" opacity="0.5" />
+
+  <!-- Chlorosis Halo (Yellow Discoloration) -->
+  <circle cx="340" cy="270" r="110" fill="url(#haloGrad)" />
+  <circle cx="480" cy="360" r="90" fill="url(#haloGrad)" />
+
+  <!-- Primary Target Spot Lesion (Alternaria concentric rings) -->
+  <ellipse cx="330" cy="265" rx="55" ry="48" fill="url(#lesionGrad)" />
+  <ellipse cx="330" cy="265" rx="42" ry="36" fill="none" stroke="#3d1e03" stroke-width="3" opacity="0.8" />
+  <ellipse cx="330" cy="265" rx="28" ry="24" fill="none" stroke="#2b1400" stroke-width="2.5" opacity="0.9" />
+  <circle cx="330" cy="265" r="10" fill="#1b0a00" />
+
+  <!-- Secondary Lesion -->
+  <ellipse cx="480" cy="360" rx="40" ry="32" fill="url(#lesionGrad)" />
+  <ellipse cx="480" cy="360" rx="26" ry="20" fill="none" stroke="#3d1e03" stroke-width="2" opacity="0.8" />
+  <circle cx="480" cy="360" r="7" fill="#1b0a00" />
+
+  <!-- HUD AI Bounding Box Overlays -->
+  <rect x="250" y="190" width="165" height="150" rx="8" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="6 4" />
+  <rect x="250" y="165" width="145" height="25" rx="4" fill="#dc2626" />
+  <text x="256" y="182" fill="#ffffff" font-family="system-ui, sans-serif" font-size="11" font-weight="bold">Primary Lesion (96.2%)</text>
+
+  <rect x="420" y="300" width="130" height="120" rx="8" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4" />
+  <rect x="420" y="278" width="135" height="22" rx="4" fill="#d97706" />
+  <text x="426" y="294" fill="#ffffff" font-family="system-ui, sans-serif" font-size="11" font-weight="bold">Chlorosis Halo (91.1%)</text>
+
+  <!-- Watermark HUD -->
+  <text x="40" y="560" fill="#94a3b8" font-family="monospace" font-size="12">KrishiDrishti Vision AI • Model: Solanaceae-Net v4.1 • Resolution: 3024x4032</text>
+</svg>
