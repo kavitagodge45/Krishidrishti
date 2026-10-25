@@ -55,27 +55,7 @@ export const WeatherAdvisory: React.FC = () => {
   const availableDistricts = getDistrictsByState(selectedState);
   const availableTalukas = getTalukasByDistrict(selectedState, selectedDistrict);
 
-  // Locations list covering Maharashtra districts and benchmark agro-climatic zones
-  const locations = [
-    { key: 'loc_dindori', value: 'Dindori Block, Nashik, MH (422202)', state: 'Maharashtra', district: 'Nashik', taluka: 'Dindori', lat: 20.2033, lon: 73.8317 },
-    { key: 'loc_niphad', value: 'Niphad Taluka, Nashik, MH (422303)', state: 'Maharashtra', district: 'Nashik', taluka: 'Niphad', lat: 20.0766, lon: 74.1100 },
-    { key: 'loc_baramati', value: 'Baramati Taluka, Pune, MH (413102)', state: 'Maharashtra', district: 'Pune', taluka: 'Baramati', lat: 18.1519, lon: 74.5772 },
-    { key: 'loc_amravati', value: 'Amravati District Cluster, MH (444601)', state: 'Maharashtra', district: 'Amravati', taluka: 'Warud (Rajura Bazar)', lat: 21.4667, lon: 78.2667 },
-    { key: 'loc_khanna', value: 'Khanna APMC Cluster, Ludhiana, PB (141401)', state: 'Punjab', district: 'Ludhiana', taluka: 'Khanna', lat: 30.7073, lon: 76.2167 },
-    { key: 'loc_indore', value: 'Indore Agro-Meteorological Grid, MP (452001)', state: 'Madhya Pradesh', district: 'Indore', taluka: 'Indore Central', lat: 22.7196, lon: 75.8577 }
-  ];
 
-  // Quick Preset Locations
-  const presets = [
-    { label: 'Dindori (Nashik, MH)', state: 'Maharashtra', district: 'Nashik', taluka: 'Dindori', lat: 20.2033, lon: 73.8317 },
-    { label: 'Niphad (Nashik, MH)', state: 'Maharashtra', district: 'Nashik', taluka: 'Niphad', lat: 20.0766, lon: 74.1100 },
-    { label: 'Umri (Nanded, MH)', state: 'Maharashtra', district: 'Nanded', taluka: 'Umri', lat: 19.0391, lon: 77.6454 },
-    { label: 'Baramati (Pune, MH)', state: 'Maharashtra', district: 'Pune', taluka: 'Baramati', lat: 18.1519, lon: 74.5772 },
-    { label: 'Warud (Amravati, MH)', state: 'Maharashtra', district: 'Amravati', taluka: 'Warud (Rajura Bazar)', lat: 21.4667, lon: 78.2667 },
-    { label: 'Khanna (Ludhiana, PB)', state: 'Punjab', district: 'Ludhiana', taluka: 'Khanna', lat: 30.7073, lon: 76.2167 },
-    { label: 'Indore (MP)', state: 'Madhya Pradesh', district: 'Indore', taluka: 'Indore Central', lat: 22.7196, lon: 75.8577 },
-    { label: 'Gondal (Rajkot, GJ)', state: 'Gujarat', district: 'Rajkot', taluka: 'Gondal', lat: 21.9600, lon: 70.8000 }
-  ];
 
   const loadWeather = async (
     label: string, 
@@ -188,19 +168,6 @@ export const WeatherAdvisory: React.FC = () => {
     );
   };
 
-  // Preset quick click
-  const handleSelectPreset = (p: typeof presets[0]) => {
-    setSelectedState(p.state);
-    setSelectedDistrict(p.district);
-    setSelectedTaluka(p.taluka);
-    setActiveCoords({ lat: p.lat, lon: p.lon });
-    setLocationLabel(p.label);
-    loadWeather(p.label, { lat: p.lat, lon: p.lon }, {
-      state: p.state,
-      district: p.district,
-      taluka: p.taluka
-    });
-  };
 
   // Search by keyword / town name
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -321,27 +288,6 @@ export const WeatherAdvisory: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Preset Chips */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-            <span className="text-[11px] font-bold text-slate-400 mr-1">Quick Hubs:</span>
-            {locations.map((loc) => {
-              const isActive = selectedDistrict === loc.district && selectedTaluka === loc.taluka;
-              return (
-                <button
-                  key={loc.key}
-                  type="button"
-                  onClick={() => handleSelectPreset(loc as any)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                    isActive
-                      ? 'bg-[#124131] text-white shadow-2xs'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {t(loc.key as any)}
-                </button>
-              );
-            })}
-          </div>
 
           {/* Search box for any town/village across India */}
           <form onSubmit={handleSearchSubmit} className="pt-2 flex items-center gap-2">

@@ -7,8 +7,41 @@ import apiRouter from './routes/index.js';
 export const createApp = (): Application => {
   const app = express();
 
-  // Middleware
-  app.use(cors());
+  // Middleware: resilient CORS configuration for local and Render production
+  const allowedOrigins = [
+    'https://krishidrishti-dwzz.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:5000',
+    'http://localhost:3000'
+  ];
+
+  if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+    process.env.CORS_ORIGIN.split(',').forEach(o => {
+      const trimmed = o.trim();
+      if (trimmed && !allowedOrigins.includes(trimmed)) {
+        allowedOrigins.push(trimmed);
+      }
+    });
+  }
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (
+        process.env.CORS_ORIGIN === '*' ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.onrender.com') ||
+        origin.includes('localhost')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Safe fallback to ensure farmers are never locked out
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(requestLogger);

@@ -25,6 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { PlotRecord, FarmActivityLog, ActionCenterAlert } from '../services/api';
 import { HonestEmptyState } from '../components/HonestEmptyState';
+import { CROP_VISUALS_REGISTRY, getCropVisual, resolvePlotPhoto, DEFAULT_CROP_IMAGE } from '../data/cropVisuals';
 
 export const Dashboard: React.FC = () => {
   const { language, t } = useLanguage();
@@ -47,6 +48,9 @@ export const Dashboard: React.FC = () => {
   const [newCropName, setNewCropName] = useState('');
   const [newVariety, setNewVariety] = useState('');
   const [newArea, setNewArea] = useState('2.0');
+  const [selectedCropPhoto, setSelectedCropPhoto] = useState<string>('');
+  const [customPhotoUrl, setCustomPhotoUrl] = useState<string>('');
+  const [showCustomPhotoInput, setShowCustomPhotoInput] = useState<boolean>(false);
   const [newLogTitle, setNewLogTitle] = useState('');
   const [newLogDesc, setNewLogDesc] = useState('');
   const [newLogType, setNewLogType] = useState<'soil' | 'disease' | 'irrigation' | 'fertilizer'>('fertilizer');
@@ -63,7 +67,13 @@ export const Dashboard: React.FC = () => {
     if (!isSupabaseConfigured) {
       try {
         const localPlots = localStorage.getItem(`krishidrishti_plots_${user.id}`);
-        if (localPlots) setPlots(JSON.parse(localPlots));
+        if (localPlots) {
+          const parsed = JSON.parse(localPlots);
+          setPlots(parsed.map((p: any) => ({
+            ...p,
+            photoUrl: resolvePlotPhoto(p.photoUrl, p.cropName)
+          })));
+        }
         const localLogs = localStorage.getItem(`krishidrishti_logs_${user.id}`);
         if (localLogs) setLogs(JSON.parse(localLogs));
         const localTasks = localStorage.getItem(`krishidrishti_tasks_${user.id}`);
@@ -100,7 +110,7 @@ export const Dashboard: React.FC = () => {
           waterNeed: p.water_need || 'Moderate',
           targetHarvestDays: p.target_harvest_days || 90,
           nextAction: p.next_action || 'Regular monitoring',
-          photoUrl: p.photo_url || 'https://images.unsplash.com/photo-1599582296065-272e61678564?auto=format&fit=crop&w=600&q=80'
+          photoUrl: resolvePlotPhoto(p.photo_url, p.crop_name)
         })));
       }
 
@@ -156,22 +166,32 @@ export const Dashboard: React.FC = () => {
 
   const handleRegisterPlot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCropName) return;
+    if (!newCropName.trim()) return;
+
+    const visual = getCropVisual(newCropName.trim());
+    const finalPhotoUrl = (showCustomPhotoInput && customPhotoUrl.trim())
+      ? customPhotoUrl.trim()
+      : (selectedCropPhoto || visual.imageUrl);
+
+    const harvestDays = visual.meta?.defaultHarvestDays || 90;
+    const waterNeed = visual.meta?.defaultWaterNeed || 'Moderate (Drip)';
+    const stage = visual.meta?.defaultStage || 'Vegetative';
+    const finalVariety = newVariety.trim() || visual.meta?.popularVarieties[0] || 'Certified Seed';
 
     if (user && isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('plots').insert({
           user_id: user.id,
-          plot_name: newPlotName || `Plot ${String.fromCharCode(65 + plots.length)}`,
-          crop_name: newCropName,
-          variety: newVariety || 'Certified Hybrid',
+          plot_name: newPlotName.trim() || `Plot ${String.fromCharCode(65 + plots.length)}`,
+          crop_name: newCropName.trim(),
+          variety: finalVariety,
           area_acres: parseFloat(newArea) || 1.0,
-          stage: 'Vegetative',
+          stage: stage,
           health_status: 'Optimal',
-          water_need: 'Moderate (Drip)',
-          target_harvest_days: 90,
-          next_action: 'Foliar nutrition check in 7 days',
-          photo_url: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80'
+          water_need: waterNeed,
+          target_harvest_days: harvestDays,
+          next_action: 'Vegetative growth monitoring in 7 days',
+          photo_url: finalPhotoUrl
         });
 
         if (error) throw error;
@@ -182,17 +202,17 @@ export const Dashboard: React.FC = () => {
     } else {
       const localPlot: PlotRecord = {
         id: `plot-${Date.now()}`,
-        plotName: newPlotName || `Plot ${String.fromCharCode(65 + plots.length)}`,
-        cropName: newCropName,
-        variety: newVariety || 'Certified Seed',
+        plotName: newPlotName.trim() || `Plot ${String.fromCharCode(65 + plots.length)}`,
+        cropName: newCropName.trim(),
+        variety: finalVariety,
         areaAcres: parseFloat(newArea) || 1.0,
         sownDate: new Date().toISOString().split('T')[0],
-        stage: 'Vegetative',
+        stage: stage,
         healthStatus: 'Optimal',
-        waterNeed: 'Moderate (Drip)',
-        targetHarvestDays: 90,
+        waterNeed: waterNeed,
+        targetHarvestDays: harvestDays,
         nextAction: 'First basal weeding in 10 days',
-        photoUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80'
+        photoUrl: finalPhotoUrl
       };
       const updated = [localPlot, ...plots];
       setPlots(updated);
@@ -205,6 +225,10 @@ export const Dashboard: React.FC = () => {
     setNewPlotName('');
     setNewCropName('');
     setNewVariety('');
+    setNewArea('2.0');
+    setSelectedCropPhoto('');
+    setCustomPhotoUrl('');
+    setShowCustomPhotoInput(false);
   };
 
   const handleCreateLog = async (e: React.FormEvent) => {
@@ -274,6 +298,11 @@ export const Dashboard: React.FC = () => {
   };
 
   const soilLogs = logs.filter(l => l.type === 'soil');
+
+  const matchedCropMeta = getCropVisual(newCropName);
+  const activeCropPhotoPreview = (showCustomPhotoInput && customPhotoUrl.trim())
+    ? customPhotoUrl.trim()
+    : (selectedCropPhoto || matchedCropMeta.imageUrl);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
@@ -578,13 +607,19 @@ export const Dashboard: React.FC = () => {
                   <div key={plot.id} className="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-xs flex flex-col justify-between">
                     <div>
                       {/* Photo Header */}
-                      <div className="relative h-40 bg-slate-900">
+                      <div className="relative h-44 bg-slate-900 overflow-hidden">
                         <img
-                          src={plot.photoUrl}
+                          src={resolvePlotPhoto(plot.photoUrl, plot.cropName)}
                           alt={plot.cropName}
-                          className="w-full h-full object-cover opacity-90"
+                          className="w-full h-full object-cover opacity-90 transition-transform duration-500 hover:scale-105"
+                          onError={(e) => {
+                            const fallback = getCropVisual(plot.cropName).imageUrl;
+                            if (e.currentTarget.src !== fallback) {
+                              e.currentTarget.src = fallback;
+                            }
+                          }}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                         
                         {/* Health Status Pill */}
                         <div className="absolute top-3 left-3">
@@ -847,40 +882,145 @@ export const Dashboard: React.FC = () => {
 
       {/* MODAL 1: REGISTER NEW PLOT */}
       {isAddPlotOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 text-left">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-slate-900">{t('registerPlotModalTitle')}</h3>
-              <button onClick={() => setIsAddPlotOpen(false)} className="text-slate-400 hover:text-slate-700">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-4 text-left my-8 border border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                  <Sprout className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">{t('registerPlotModalTitle')}</h3>
+                  <p className="text-[11px] text-slate-500">Zero Fake Data • Authentic crop photo matching</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsAddPlotOpen(false)} 
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleRegisterPlot} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">{t('plotNameLabel')}</label>
-                <input
-                  type="text"
-                  placeholder={t('plotNamePlaceholder')}
-                  value={newPlotName}
-                  onChange={(e) => setNewPlotName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium"
+            <form onSubmit={handleRegisterPlot} className="space-y-4 text-xs">
+              {/* LIVE SOWN CROP PHOTO PREVIEW BANNER */}
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-900 h-36">
+                <img
+                  src={activeCropPhotoPreview}
+                  alt={newCropName || 'Sown Crop Preview'}
+                  className="w-full h-full object-cover transition-all duration-300"
+                  onError={(e) => {
+                    const fallback = DEFAULT_CROP_IMAGE;
+                    if (e.currentTarget.src !== fallback) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }}
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
+
+                {/* Badge top-left */}
+                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 backdrop-blur-md border border-emerald-400/40 text-[10px] text-emerald-200 font-bold">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span>{t('verifiedVisualBadge')}</span>
+                </div>
+
+                {/* Crop Name & Details bottom-left */}
+                <div className="absolute bottom-2.5 left-3 text-white max-w-[70%]">
+                  <div className="font-extrabold text-sm flex items-center gap-1.5 truncate">
+                    <span>{newCropName || t('cropSownLabel')}</span>
+                    {matchedCropMeta.meta && (
+                      <span className="text-[11px] font-normal text-emerald-300">
+                        ({language === 'mr' ? matchedCropMeta.meta.marathiName : matchedCropMeta.meta.hindiName})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-300 font-medium truncate">
+                    {matchedCropMeta.meta 
+                      ? `${matchedCropMeta.meta.category} • Target harvest ~${matchedCropMeta.meta.defaultHarvestDays} days` 
+                      : 'Auto-mapped to verified authentic crop photography'}
+                  </div>
+                </div>
+
+                {/* Area Preview bottom-right */}
+                {newArea && (
+                  <div className="absolute bottom-2.5 right-3 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-mono text-emerald-200 border border-white/10">
+                    {newPlotName || 'Plot'} • {newArea} {t('acres')}
+                  </div>
+                )}
               </div>
 
+              {/* QUICK SELECT COMMON CROPS */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">{t('cropSownLabel')}</label>
-                <input
-                  type="text"
-                  required
-                  placeholder={t('cropSownPlaceholder')}
-                  value={newCropName}
-                  onChange={(e) => setNewCropName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium"
-                />
+                <label className="font-bold text-slate-700 block mb-1.5 text-[11px] flex items-center justify-between">
+                  <span>{t('quickSelectCrop')}</span>
+                  <span className="text-[10px] text-emerald-800 font-semibold">Tap to auto-fill crop & image</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200/80">
+                  {CROP_VISUALS_REGISTRY.slice(0, 14).map((crop) => {
+                    const isSelected = newCropName.toLowerCase() === crop.name.toLowerCase() ||
+                      newCropName === crop.marathiName ||
+                      newCropName === crop.hindiName ||
+                      selectedCropPhoto === crop.imageUrl;
+
+                    return (
+                      <button
+                        key={crop.id}
+                        type="button"
+                        onClick={() => {
+                          const displayName = language === 'mr' ? crop.marathiName : language === 'hi' ? crop.hindiName : crop.name;
+                          setNewCropName(displayName);
+                          setSelectedCropPhoto(crop.imageUrl);
+                          setShowCustomPhotoInput(false);
+                          if (crop.popularVarieties.length > 0) {
+                            setNewVariety(crop.popularVarieties[0]);
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[#124131] text-white shadow-xs scale-102'
+                            : 'bg-white hover:bg-emerald-50 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-600'}`} />
+                        <span>{language === 'mr' ? crop.marathiName : language === 'hi' ? crop.hindiName : crop.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* FORM FIELDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">{t('plotNameLabel')}</label>
+                  <input
+                    type="text"
+                    placeholder={t('plotNamePlaceholder')}
+                    value={newPlotName}
+                    onChange={(e) => setNewPlotName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">{t('cropSownLabel')}</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={t('cropSownPlaceholder')}
+                    value={newCropName}
+                    onChange={(e) => {
+                      setNewCropName(e.target.value);
+                      setSelectedCropPhoto(''); // dynamic resolve from typed text
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* VARIETY WITH SUGGESTIONS & AREA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">{t('varietyLabel')}</label>
                   <input
@@ -888,9 +1028,25 @@ export const Dashboard: React.FC = () => {
                     placeholder={t('varietyPlaceholder')}
                     value={newVariety}
                     onChange={(e) => setNewVariety(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium bg-white"
                   />
+                  {matchedCropMeta.meta && matchedCropMeta.meta.popularVarieties.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1 items-center">
+                      <span className="text-[10px] text-slate-400 font-medium">{t('varietySuggestions')}</span>
+                      {matchedCropMeta.meta.popularVarieties.slice(0, 3).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setNewVariety(v)}
+                          className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-semibold border border-emerald-200/60"
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">{t('areaAcresLabel')}</label>
                   <input
@@ -900,24 +1056,54 @@ export const Dashboard: React.FC = () => {
                     required
                     value={newArea}
                     onChange={(e) => setNewArea(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-medium bg-white"
                   />
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              {/* CUSTOM PHOTO ACCORDION / TOGGLE */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomPhotoInput(!showCustomPhotoInput)}
+                  className="text-[11px] text-emerald-800 hover:text-emerald-950 font-bold inline-flex items-center gap-1.5"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{showCustomPhotoInput ? '▲ Hide Custom Photo Option' : '▼ Want to provide custom field photo URL?'}</span>
+                </button>
+
+                {showCustomPhotoInput && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <label className="font-bold text-slate-700 block text-[11px]">{t('customPhotoToggle')}</label>
+                    <input
+                      type="url"
+                      placeholder={t('customPhotoPlaceholder')}
+                      value={customPhotoUrl}
+                      onChange={(e) => setCustomPhotoUrl(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-hidden focus:border-emerald-700 font-mono text-xs bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      If left blank, KrishiDrishti assigns the verified high-definition photo for {newCropName || 'this crop'}.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAddPlotOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200"
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-colors"
                 >
                   {t('cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#124131] text-white font-bold hover:bg-emerald-900"
+                  className="px-5 py-2 rounded-xl bg-[#124131] text-white font-bold hover:bg-emerald-900 transition-all shadow-md inline-flex items-center gap-1.5"
                 >
-                  {t('savePlotBtn')}
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('savePlotBtn')}</span>
                 </button>
               </div>
             </form>

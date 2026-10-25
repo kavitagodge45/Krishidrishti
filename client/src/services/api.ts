@@ -4,7 +4,26 @@
  */
 import { supabase } from './supabase';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const rawApiUrl = import.meta.env.VITE_API_URL;
+let cleanApiUrl = '';
+if (rawApiUrl) {
+  cleanApiUrl = rawApiUrl.trim();
+  if (!cleanApiUrl.startsWith('http://') && !cleanApiUrl.startsWith('https://')) {
+    cleanApiUrl = `https://${cleanApiUrl}`;
+  }
+  cleanApiUrl = cleanApiUrl.replace(/\/+$/, '');
+}
+
+// In local dev, default to port 5000. In production, use configured VITE_API_URL or safe origin.
+export const API_BASE_URL = cleanApiUrl || (import.meta.env.DEV ? 'http://localhost:5000' : '');
+
+const getEffectiveBaseUrl = (): string => {
+  if (API_BASE_URL) return API_BASE_URL;
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin;
+  }
+  return 'http://localhost:5000';
+};
 
 export interface PlotRecord {
   id: string;
@@ -239,6 +258,7 @@ export const diagnoseCropImage = async (
   cropHint?: string,
   notes?: string
 ): Promise<{ success: boolean; data?: DiseaseDiagnosisResult; message?: string; unconfigured?: boolean }> => {
+  const baseUrl = getEffectiveBaseUrl();
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
@@ -250,7 +270,7 @@ export const diagnoseCropImage = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/crop-doctor/diagnose`, {
+    const response = await fetch(`${baseUrl}/api/crop-doctor/diagnose`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ imageBase64, cropHint, notes })
@@ -270,7 +290,7 @@ export const diagnoseCropImage = async (
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti AI Vision server: ${err.message}. Ensure backend is running on ${API_BASE_URL}.`
+      message: `Failed to connect to KrishiDrishti AI Vision server: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
     };
   }
 };
@@ -285,6 +305,7 @@ export const sendAssistantQuery = async (
   history?: { role: 'user' | 'model'; parts: { text: string }[] }[],
   farmContext?: any
 ): Promise<{ success: boolean; reply?: string; message?: string; unconfigured?: boolean }> => {
+  const baseUrl = getEffectiveBaseUrl();
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
@@ -296,7 +317,7 @@ export const sendAssistantQuery = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/assistant/chat`, {
+    const response = await fetch(`${baseUrl}/api/assistant/chat`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ message, language, history, farmContext })
@@ -316,7 +337,7 @@ export const sendAssistantQuery = async (
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to Krishi Mitra server: ${err.message}. Ensure backend is running on ${API_BASE_URL}.`
+      message: `Failed to connect to Krishi Mitra server: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
     };
   }
 };
@@ -330,8 +351,9 @@ export const fetchWeatherAdvisory = async (
   coords?: { lat: number; lon: number },
   extra?: { state?: string; district?: string; taluka?: string }
 ): Promise<{ success: boolean; data?: WeatherData; message?: string; unconfigured?: boolean }> => {
+  const baseUrl = getEffectiveBaseUrl();
   try {
-    const url = new URL(`${API_BASE_URL}/api/weather`);
+    const url = new URL(`${baseUrl}/api/weather`);
     if (locationString) {
       url.searchParams.set('location', locationString);
     }
@@ -358,7 +380,7 @@ export const fetchWeatherAdvisory = async (
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti weather service: ${err.message}. Ensure backend is running on ${API_BASE_URL}.`
+      message: `Failed to connect to KrishiDrishti weather service: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
     };
   }
 };
@@ -372,8 +394,9 @@ export const fetchLiveMandiPrices = async (
   state?: string,
   search?: string
 ): Promise<{ success: boolean; data?: MandiRecord[]; message?: string; unconfigured?: boolean }> => {
+  const baseUrl = getEffectiveBaseUrl();
   try {
-    const url = new URL(`${API_BASE_URL}/api/mandi/prices`);
+    const url = new URL(`${baseUrl}/api/mandi/prices`);
     if (commodity && commodity !== 'All') url.searchParams.set('commodity', commodity);
     if (state && state !== 'All') url.searchParams.set('state', state);
     if (search && search.trim()) url.searchParams.set('search', search.trim());
@@ -393,7 +416,7 @@ export const fetchLiveMandiPrices = async (
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti mandi service: ${err.message}. Ensure backend is running on ${API_BASE_URL}.`,
+      message: `Failed to connect to KrishiDrishti mandi service: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`,
       data: []
     };
   }
