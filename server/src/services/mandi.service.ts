@@ -53,7 +53,27 @@ export const fetchRealMandiPrices = async (
       url += `&filters[state]=${encodeURIComponent(stateFilter)}`;
     }
     if (commodityFilter && commodityFilter !== 'All') {
-      const cleanCommodity = commodityFilter.split('(')[0].trim();
+      let cleanCommodity = commodityFilter.split('(')[0].trim();
+      // Map UI names to official Agmarknet nomenclature (e.g. Soybean -> Soyabean)
+      const COMMODITY_MAP: Record<string, string> = {
+        'soybean': 'Soyabean',
+        'cotton': 'Cotton',
+        'wheat': 'Wheat',
+        'onion': 'Onion',
+        'gram': 'Gram',
+        'chana': 'Gram',
+        'tomato': 'Tomato',
+        'grapes': 'Grapes',
+        'pomegranate': 'Pomegranate',
+        'maize': 'Maize'
+      };
+      const lower = cleanCommodity.toLowerCase();
+      for (const [k, v] of Object.entries(COMMODITY_MAP)) {
+        if (lower.includes(k)) {
+          cleanCommodity = v;
+          break;
+        }
+      }
       url += `&filters[commodity]=${encodeURIComponent(cleanCommodity)}`;
     }
 

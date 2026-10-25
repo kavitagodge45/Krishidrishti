@@ -35,17 +35,58 @@ export const CropDoctor: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isUnconfigured, setIsUnconfigured] = useState<boolean>(false);
 
+  /**
+   * Resizes and compresses large camera photographs in the browser
+   * Prevents HTTP 413 Payload Too Large and speeds up inference on mobile networks.
+   */
+  const compressImage = (dataUrl: string, maxDimension = 1600, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 15 * 1024 * 1024) {
-        alert("File size exceeds 15MB. Please upload a smaller photo.");
+      if (file.size > 25 * 1024 * 1024) {
+        alert("File size exceeds 25MB. Please upload a smaller photo.");
         return;
       }
 
       const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        setSelectedImage(uploadEvent.target?.result as string);
+      reader.onload = async (uploadEvent) => {
+        const raw = uploadEvent.target?.result as string;
+        try {
+          const optimized = await compressImage(raw);
+          setSelectedImage(optimized);
+        } catch {
+          setSelectedImage(raw);
+        }
         setAnalysisResult(null);
         setApiError(null);
         setIsUnconfigured(false);
