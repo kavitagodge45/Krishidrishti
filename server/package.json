@@ -4,6 +4,7 @@
   "license": "ISC",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "prebuild": "npm install --include=dev",
     "build": "tsc",
     "start": "node dist/server.js"
   },
