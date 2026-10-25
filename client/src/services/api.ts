@@ -3,6 +3,7 @@
  * Real-Data-Only Architecture
  */
 import { supabase } from './supabase';
+import { fetchDirectOpenMeteo } from './openMeteoDirect';
 
 const rawApiUrl = import.meta.env.VITE_API_URL;
 let cleanApiUrl = '';
@@ -23,6 +24,24 @@ const getEffectiveBaseUrl = (): string => {
     return window.location.origin;
   }
   return 'http://localhost:5000';
+};
+
+/**
+ * Robust JSON response reader that never crashes on non-JSON 404/502/HTML pages
+ */
+const safeParseResponse = async (response: Response): Promise<{ isJson: boolean; data: any; rawText: string }> => {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await response.json();
+      return { isJson: true, data, rawText: '' };
+    } catch {
+      const rawText = await response.text().catch(() => '');
+      return { isJson: false, data: null, rawText };
+    }
+  }
+  const rawText = await response.text().catch(() => '');
+  return { isJson: false, data: null, rawText };
 };
 
 export interface PlotRecord {
@@ -276,21 +295,32 @@ export const diagnoseCropImage = async (
       body: JSON.stringify({ imageBase64, cropHint, notes })
     });
 
-    const body = await response.json();
+    const parsed = await safeParseResponse(response);
 
-    if (response.status === 503 || body.status === 'UNCONFIGURED') {
-      return { success: false, unconfigured: true, message: body.message };
+    if (response.status === 404 || !parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: true,
+        message: 'KrishiDrishti AI Vision Backend Service is not connected. In production, deploy krishidrishti-server on Render with GEMINI_API_KEY configured to enable AI diagnosis.'
+      };
     }
 
-    if (!response.ok || !body.success) {
-      return { success: false, message: body.message || 'Diagnosis failed.' };
+    const body = parsed.data;
+
+    if (response.status === 503 || body?.status === 'UNCONFIGURED') {
+      return { success: false, unconfigured: true, message: body?.message };
+    }
+
+    if (!response.ok || !body?.success) {
+      return { success: false, message: body?.message || 'Diagnosis failed.' };
     }
 
     return { success: true, data: body.data };
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti AI Vision server: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
+      unconfigured: true,
+      message: `Failed to connect to KrishiDrishti AI Vision server (${err.message}). Ensure backend Web Service is running and VITE_API_URL is configured.`
     };
   }
 };
@@ -323,28 +353,40 @@ export const sendAssistantQuery = async (
       body: JSON.stringify({ message, language, history, farmContext })
     });
 
-    const body = await response.json();
+    const parsed = await safeParseResponse(response);
 
-    if (response.status === 503 || body.status === 'UNCONFIGURED') {
-      return { success: false, unconfigured: true, message: body.message };
+    if (response.status === 404 || !parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: true,
+        message: 'Krishi Mitra AI Assistant Backend Service is not connected. In production, deploy krishidrishti-server on Render with GEMINI_API_KEY configured to enable chat.'
+      };
     }
 
-    if (!response.ok || !body.success) {
-      return { success: false, message: body.message || 'Assistant response failed.' };
+    const body = parsed.data;
+
+    if (response.status === 503 || body?.status === 'UNCONFIGURED') {
+      return { success: false, unconfigured: true, message: body?.message };
+    }
+
+    if (!response.ok || !body?.success) {
+      return { success: false, message: body?.message || 'Assistant response failed.' };
     }
 
     return { success: true, reply: body.data?.reply };
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to Krishi Mitra server: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
+      unconfigured: true,
+      message: `Failed to connect to Krishi Mitra server (${err.message}). Ensure backend Web Service is running and VITE_API_URL is configured.`
     };
   }
 };
 
 /**
  * Genuine Open-Meteo Weather Telemetry API call
- * Queries backend endpoint which connects to Open-Meteo with real farm coordinates.
+ * Tries server-side endpoint first, and automatically falls back to direct Open-Meteo API query.
+ * Zero Fake Data: both paths query the official Open-Meteo atmospheric observation model.
  */
 export const fetchWeatherAdvisory = async (
   locationString?: string,
@@ -352,11 +394,11 @@ export const fetchWeatherAdvisory = async (
   extra?: { state?: string; district?: string; taluka?: string }
 ): Promise<{ success: boolean; data?: WeatherData; message?: string; unconfigured?: boolean }> => {
   const baseUrl = getEffectiveBaseUrl();
+
+  // Primary: Attempt backend weather endpoint
   try {
     const url = new URL(`${baseUrl}/api/weather`);
-    if (locationString) {
-      url.searchParams.set('location', locationString);
-    }
+    if (locationString) url.searchParams.set('location', locationString);
     if (coords && typeof coords.lat === 'number' && typeof coords.lon === 'number') {
       url.searchParams.set('lat', coords.lat.toString());
       url.searchParams.set('lon', coords.lon.toString());
@@ -366,21 +408,23 @@ export const fetchWeatherAdvisory = async (
     if (extra?.taluka) url.searchParams.set('taluka', extra.taluka);
 
     const response = await fetch(url.toString());
-    const body = await response.json();
+    const parsed = await safeParseResponse(response);
 
-    if (response.status === 503 || body.status === 'UNCONFIGURED') {
-      return { success: false, unconfigured: true, message: body.message };
+    if (response.ok && parsed.isJson && parsed.data?.success && parsed.data?.data) {
+      return { success: true, data: parsed.data.data };
     }
+  } catch {
+    // Backend unavailable: fall through to direct Open-Meteo client query
+  }
 
-    if (!response.ok || !body.success) {
-      return { success: false, message: body.message || 'Failed to fetch weather telemetry.' };
-    }
-
-    return { success: true, data: body.data };
+  // Resilient Fallback: Direct Open-Meteo query from client (100% Real Live Telemetry, No API Key needed)
+  try {
+    const directData = await fetchDirectOpenMeteo(locationString, coords, extra);
+    return { success: true, data: directData };
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti weather service: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`
+      message: `Failed to retrieve live weather telemetry: ${err.message || 'Network request failed'}. Please check your connection.`
     };
   }
 };
@@ -388,6 +432,7 @@ export const fetchWeatherAdvisory = async (
 /**
  * Genuine Agmarknet / Data.gov.in Live Mandi API call
  * Queries backend endpoint with official filters.
+ * Returns honest unconfigured state when backend is not connected.
  */
 export const fetchLiveMandiPrices = async (
   commodity?: string,
@@ -402,21 +447,34 @@ export const fetchLiveMandiPrices = async (
     if (search && search.trim()) url.searchParams.set('search', search.trim());
 
     const response = await fetch(url.toString());
-    const body = await response.json();
+    const parsed = await safeParseResponse(response);
 
-    if (response.status === 503 || body.status === 'UNCONFIGURED') {
-      return { success: false, unconfigured: true, message: body.message, data: [] };
+    // If endpoint is not found (404) or returned non-JSON HTML from static site
+    if (response.status === 404 || !parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: true,
+        message: 'KrishiDrishti Backend Web Service is not connected. In production, deploy krishidrishti-server on Render with DATA_GOV_IN_API_KEY configured to query live Agmarknet APMC records.',
+        data: []
+      };
     }
 
-    if (!response.ok || !body.success) {
-      return { success: false, message: body.message || 'Mandi request failed.', data: [] };
+    const body = parsed.data;
+
+    if (response.status === 503 || body?.status === 'UNCONFIGURED') {
+      return { success: false, unconfigured: true, message: body?.message, data: [] };
+    }
+
+    if (!response.ok || !body?.success) {
+      return { success: false, message: body?.message || 'Mandi request failed.', data: [] };
     }
 
     return { success: true, data: body.data || [] };
   } catch (err: any) {
     return {
       success: false,
-      message: `Failed to connect to KrishiDrishti mandi service: ${err.message}. (Target: ${baseUrl}). Ensure backend Web Service is running and VITE_API_URL is configured.`,
+      unconfigured: true,
+      message: `Unable to connect to KrishiDrishti Mandi Service (${err.message || 'Network unavailable'}). Ensure krishidrishti-server is deployed on Render. Under our strict Zero Fake Data policy, simulated rates are prohibited.`,
       data: []
     };
   }
