@@ -5,26 +5,42 @@
 import { supabase } from './supabase';
 import { fetchDirectOpenMeteo } from './openMeteoDirect';
 
+const BACKEND_RENDER_URL = 'https://krishidrishti-server.onrender.com';
+
 const rawApiUrl = import.meta.env.VITE_API_URL;
 let cleanApiUrl = '';
 if (rawApiUrl) {
   cleanApiUrl = rawApiUrl.trim();
   if (!cleanApiUrl.startsWith('http://') && !cleanApiUrl.startsWith('https://')) {
-    cleanApiUrl = `https://${cleanApiUrl}`;
+    cleanApiUrl = 'https://' + cleanApiUrl;
   }
   cleanApiUrl = cleanApiUrl.replace(/\/+$/, '');
+  // Guard: If VITE_API_URL was accidentally configured to point to the static frontend site (krishidrishti-dwzz),
+  // automatically redirect it to the actual Express backend service (krishidrishti-server).
+  if (cleanApiUrl.includes('krishidrishti-dwzz')) {
+    cleanApiUrl = BACKEND_RENDER_URL;
+  }
 }
 
 // In local dev, default to port 5000. In production, use configured VITE_API_URL or safe origin.
 export const API_BASE_URL = cleanApiUrl || (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 const getEffectiveBaseUrl = (): string => {
-  if (API_BASE_URL) return API_BASE_URL;
+  // If API_BASE_URL is set and does NOT point to the frontend static site itself
+  if (API_BASE_URL) {
+    const isSelfStaticSite =
+      API_BASE_URL.includes('krishidrishti-dwzz') ||
+      (typeof window !== 'undefined' && (API_BASE_URL === window.location.origin || API_BASE_URL === window.location.href));
+    if (!isSelfStaticSite) {
+      return API_BASE_URL;
+    }
+  }
+
   if (typeof window !== 'undefined') {
     // If running on Render frontend (e.g. krishidrishti-dwzz.onrender.com),
-    // automatically connect to the deployed Render backend web service
+    // always connect directly to the deployed Render backend web service
     if (window.location.hostname.includes('onrender.com')) {
-      return 'https://krishidrishti-server.onrender.com';
+      return BACKEND_RENDER_URL;
     }
     if (window.location.origin && !window.location.origin.includes('localhost')) {
       return window.location.origin;
@@ -337,8 +353,8 @@ export const diagnoseCropImage = async (
   } catch (err: any) {
     return {
       success: false,
-      unconfigured: true,
-      message: `Failed to connect to KrishiDrishti AI Vision server (${err.message}). Ensure backend Web Service is running and VITE_API_URL is configured.`
+      unconfigured: false,
+      message: `Failed to connect to KrishiDrishti AI Vision server (${err.message}). The backend web service may be spinning up on Render (takes ~30-50s). Please retry in a moment.`
     };
   }
 };
@@ -402,8 +418,8 @@ export const sendAssistantQuery = async (
   } catch (err: any) {
     return {
       success: false,
-      unconfigured: true,
-      message: `Failed to connect to Krishi Mitra server (${err.message}). Ensure backend Web Service is running and VITE_API_URL is configured.`
+      unconfigured: false,
+      message: `Failed to connect to Krishi Mitra server (${err.message}). The backend web service may be spinning up on Render (takes ~30-50s). Please retry in a moment.`
     };
   }
 };
@@ -506,8 +522,8 @@ export const fetchLiveMandiPrices = async (
   } catch (err: any) {
     return {
       success: false,
-      unconfigured: true,
-      message: `Unable to connect to KrishiDrishti Mandi Service (${err.message || 'Network unavailable'}). Ensure krishidrishti-server is deployed on Render. Under our strict Zero Fake Data policy, simulated rates are prohibited.`,
+      unconfigured: false,
+      message: `Unable to connect to KrishiDrishti Mandi Service (${err.message || 'Network unavailable'}). The backend web service may be spinning up on Render (takes ~30-50s). Please retry shortly.`,
       data: []
     };
   }
