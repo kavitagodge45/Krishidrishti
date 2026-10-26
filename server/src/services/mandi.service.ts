@@ -15,8 +15,16 @@ import https from 'https';
  */
 function httpsGetJson(url: string, timeoutMs: number = 15000): Promise<any> {
   return new Promise((resolve, reject) => {
-    const agent = new https.Agent({ rejectUnauthorized: false });
-    const req = https.get(url, { agent }, (res) => {
+    const parsedUrl = new URL(url);
+    const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true });
+    const req = https.get(url, {
+      agent,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Host': parsedUrl.hostname
+      }
+    }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (chunk: Buffer) => chunks.push(chunk));
       res.on('end', () => {
@@ -213,14 +221,24 @@ export const fetchRealMandiPrices = async (
     };
   } catch (err: any) {
     const isAuthError = err.message && err.message.includes('UNAUTHORIZED_API_KEY');
+    const isSlimOr500 = err.message && (err.message.includes('Slim Application Error') || err.message.includes('HTTP 500'));
+    const isNetworkError = err.message && (err.message.includes('EHOSTUNREACH') || err.message.includes('ETIMEDOUT') || err.message.includes('ECONNRESET') || err.message.includes('timed out'));
+
+    let friendlyMessage = `Failed to query official Agmarknet portal: ${err.message}.`;
+    if (isAuthError) {
+      friendlyMessage = 'Invalid or unauthorized DATA_GOV_API_KEY. Please verify your API key at https://data.gov.in.';
+    } else if (isSlimOr500) {
+      friendlyMessage = 'The official Government of India portal (data.gov.in) is currently undergoing temporary server maintenance (upstream HTTP 500). Live APMC mandi data will resume automatically once data.gov.in completes its maintenance window. Under our strict Zero Fake Data policy, simulated rates are prohibited.';
+    } else if (isNetworkError) {
+      friendlyMessage = 'Unable to reach the National Agmarknet portal gateway at this moment. The Government of India server may be busy or restricting cloud connections. Please retry in a few moments.';
+    }
+
     return {
       isConfigured: !isAuthError,
       success: false,
-      message: isAuthError
-        ? 'Invalid or unauthorized DATA_GOV_API_KEY. Please verify your API key at https://data.gov.in.'
-        : `Failed to query official Agmarknet portal: ${err.message}.`,
+      message: friendlyMessage,
       records: [],
-      dataSource: 'data.gov.in API',
+      dataSource: 'National Agmarknet Portal (data.gov.in)',
       timestamp: new Date().toISOString()
     };
   }

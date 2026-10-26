@@ -308,11 +308,18 @@ export const diagnoseCropImage = async (
 
     const parsed = await safeParseResponse(response);
 
-    if (response.status === 404 || !parsed.isJson) {
+    if (response.status === 404) {
       return {
         success: false,
         unconfigured: true,
         message: 'KrishiDrishti AI Vision Backend Service is not connected. In production, deploy krishidrishti-server on Render with GEMINI_API_KEY configured to enable AI diagnosis.'
+      };
+    }
+    if (!parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: false,
+        message: parsed.rawText?.slice(0, 200) || 'Server returned a non-JSON response. The service may be waking up, please retry.'
       };
     }
 
@@ -366,11 +373,18 @@ export const sendAssistantQuery = async (
 
     const parsed = await safeParseResponse(response);
 
-    if (response.status === 404 || !parsed.isJson) {
+    if (response.status === 404) {
       return {
         success: false,
         unconfigured: true,
         message: 'Krishi Mitra AI Assistant Backend Service is not connected. In production, deploy krishidrishti-server on Render with GEMINI_API_KEY configured to enable chat.'
+      };
+    }
+    if (!parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: false,
+        message: parsed.rawText?.slice(0, 200) || 'Server returned a non-JSON response. The service may be waking up, please retry.'
       };
     }
 
@@ -461,11 +475,19 @@ export const fetchLiveMandiPrices = async (
     const parsed = await safeParseResponse(response);
 
     // If endpoint is not found (404) or returned non-JSON HTML from static site
-    if (response.status === 404 || !parsed.isJson) {
+    if (response.status === 404) {
       return {
         success: false,
         unconfigured: true,
         message: 'KrishiDrishti Backend Web Service is not connected. In production, deploy krishidrishti-server on Render with DATA_GOV_API_KEY configured to query live Agmarknet APMC records.',
+        data: []
+      };
+    }
+    if (!parsed.isJson) {
+      return {
+        success: false,
+        unconfigured: false,
+        message: parsed.rawText?.slice(0, 200) || 'Mandi service returned a non-JSON response. Upstream data.gov.in may be updating daily records.',
         data: []
       };
     }
