@@ -41,10 +41,20 @@ const supabaseServiceKey = resolveEnv(
   'SUPABASE_SERVICE_KEY'
 );
 
-const geminiModel = resolveEnv(
+const rawModel = resolveEnv(
   'GEMINI_MODEL',
   'GEMINI MODEL'
-) || 'gemini-2.0-flash';
+);
+
+// Resilient model selector: automatically converts deprecated models (1.5, 2.0, 2.5) to active gemini-3.5-flash-lite
+const sanitizeGeminiModel = (m: string): string => {
+  if (!m || m.includes('2.0') || m.includes('2.5') || m.includes('1.5')) {
+    return 'gemini-3.5-flash-lite';
+  }
+  return m;
+};
+
+const geminiModel = sanitizeGeminiModel(rawModel);
 
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),

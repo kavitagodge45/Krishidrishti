@@ -105,14 +105,39 @@ STRICT AGRI-INTEGRITY RULES:
       ]
     });
 
-    const response = await geminiAI.models.generateContent({
-      model: config.ai.modelName,
-      contents
-    });
+    const candidateModels = [
+      config.ai.modelName,
+      'gemini-3.5-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash'
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i && !m.includes('2.0') && !m.includes('2.5') && !m.includes('1.5'));
 
-    const replyText = response.text || '';
+    if (!candidateModels.includes('gemini-3.5-flash-lite')) {
+      candidateModels.unshift('gemini-3.5-flash-lite');
+    }
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        response = await geminiAI.models.generateContent({
+          model,
+          contents
+        });
+
+        if (response && response.text && response.text.trim()) {
+          break;
+        }
+      } catch (genErr: any) {
+        lastError = genErr;
+        console.warn(`Krishi Mitra model ${model} failed, attempting next model...`, genErr.message?.slice(0, 120));
+      }
+    }
+
+    const replyText = response?.text || '';
     if (!replyText.trim()) {
-      throw new Error('Gemini API returned an empty response.');
+      throw lastError || new Error('Gemini API returned an empty response.');
     }
 
     return { text: replyText.trim() };

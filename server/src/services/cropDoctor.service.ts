@@ -111,27 +111,52 @@ Return ONLY a valid JSON object matching this exact schema:
 }
 `;
 
-    const response = await geminiAI.models.generateContent({
-      model: config.ai.modelName,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: promptText },
+    const candidateModels = [
+      config.ai.modelName,
+      'gemini-3.5-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash'
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i && !m.includes('2.0') && !m.includes('2.5') && !m.includes('1.5'));
+
+    if (!candidateModels.includes('gemini-3.5-flash-lite')) {
+      candidateModels.unshift('gemini-3.5-flash-lite');
+    }
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        response = await geminiAI.models.generateContent({
+          model,
+          contents: [
             {
-              inlineData: {
-                mimeType,
-                data: base64Data
-              }
+              role: 'user',
+              parts: [
+                { text: promptText },
+                {
+                  inlineData: {
+                    mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
             }
           ]
-        }
-      ]
-    });
+        });
 
-    const responseText = response.text || '';
+        if (response && response.text && response.text.trim()) {
+          break;
+        }
+      } catch (genErr: any) {
+        lastError = genErr;
+        console.warn(`Crop Doctor model ${model} failed, attempting next model...`, genErr.message?.slice(0, 120));
+      }
+    }
+
+    const responseText = response?.text || '';
     if (!responseText.trim()) {
-      throw new Error('Gemini Vision API returned an empty response.');
+      throw lastError || new Error('Gemini Vision API returned an empty response.');
     }
 
     let parsed: any;

@@ -20,8 +20,15 @@ export const API_BASE_URL = cleanApiUrl || (import.meta.env.DEV ? 'http://localh
 
 const getEffectiveBaseUrl = (): string => {
   if (API_BASE_URL) return API_BASE_URL;
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return window.location.origin;
+  if (typeof window !== 'undefined') {
+    // If running on Render frontend (e.g. krishidrishti-dwzz.onrender.com),
+    // automatically connect to the deployed Render backend web service
+    if (window.location.hostname.includes('onrender.com')) {
+      return 'https://krishidrishti-server.onrender.com';
+    }
+    if (window.location.origin && !window.location.origin.includes('localhost')) {
+      return window.location.origin;
+    }
   }
   return 'http://localhost:5000';
 };
