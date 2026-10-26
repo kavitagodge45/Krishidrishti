@@ -44,7 +44,7 @@ const supabaseServiceKey = resolveEnv(
 const geminiModel = resolveEnv(
   'GEMINI_MODEL',
   'GEMINI MODEL'
-) || 'gemini-2.5-flash';
+) || 'gemini-2.0-flash';
 
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),

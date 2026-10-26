@@ -17,7 +17,7 @@ import { HonestEmptyState } from '../components/HonestEmptyState';
 export const MandiPrices: React.FC = () => {
   const { language, t } = useLanguage();
   const [selectedCommodity, setSelectedCommodity] = useState('All');
-  const [selectedState, setSelectedState] = useState('All');
+  const [selectedState, setSelectedState] = useState('Maharashtra');
   const [searchQuery, setSearchQuery] = useState('');
   const [mandiRecords, setMandiRecords] = useState<MandiRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,7 +269,7 @@ export const MandiPrices: React.FC = () => {
             description={
               statusMessage ||
               (isUnconfigured
-                ? "To query live Agmarknet APMC market rates directly from the Government of India portal, configure DATA_GOV_IN_API_KEY in server/.env with your free key from https://data.gov.in. Under KrishiDrishti's strict Zero Fake Data policy, simulated or fabricated mandi rates are prohibited."
+                ? "To query live Agmarknet APMC market rates directly from the Government of India portal, configure DATA_GOV_API_KEY in server/.env with your free key from https://data.gov.in. Under KrishiDrishti's strict Zero Fake Data policy, simulated or fabricated mandi rates are prohibited."
                 : t('noMandiRecordsDesc'))
             }
             actionText={t('visitAgmarknetPortal')}

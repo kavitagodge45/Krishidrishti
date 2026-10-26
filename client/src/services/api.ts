@@ -111,6 +111,10 @@ export interface MandiRecord {
   modalPrice: number;
   unit: string;
   arrivalDate: string;
+  date?: string;
+  minimum?: number;
+  maximum?: number;
+  modal?: number;
   dailyChangePercent?: number;
 }
 
@@ -454,7 +458,7 @@ export const fetchLiveMandiPrices = async (
       return {
         success: false,
         unconfigured: true,
-        message: 'KrishiDrishti Backend Web Service is not connected. In production, deploy krishidrishti-server on Render with DATA_GOV_IN_API_KEY configured to query live Agmarknet APMC records.',
+        message: 'KrishiDrishti Backend Web Service is not connected. In production, deploy krishidrishti-server on Render with DATA_GOV_API_KEY configured to query live Agmarknet APMC records.',
         data: []
       };
     }
