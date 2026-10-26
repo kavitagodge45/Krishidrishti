@@ -111,8 +111,16 @@ export const fetchRealMandiPrices = async (
   stateFilter?: string,
   searchQuery?: string
 ): Promise<MandiFetchResult> => {
-  // Read the API key only from process.env.DATA_GOV_API_KEY
-  const apiKey = (process.env.DATA_GOV_API_KEY || '').trim();
+  // Read the API key from DATA_GOV_API_KEY, supporting Render's DATA_GOV_IN_API_KEY variant
+  const apiKey = (
+    process.env.DATA_GOV_API_KEY ||
+    process.env['DATA_GOV_API_KEY'] ||
+    process.env.DATA_GOV_IN_API_KEY ||
+    process.env['DATA_GOV_IN_API_KEY'] ||
+    process.env['DATA GOV API KEY'] ||
+    process.env['DATA GOV IN API KEY'] ||
+    ''
+  ).trim();
 
   if (!apiKey || apiKey.includes('your-data-gov-in-key') || apiKey.length < 10) {
     return {

@@ -145,11 +145,11 @@ export const Assistant: React.FC = () => {
           sender: 'ai',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           badge: 'Service Unconfigured',
-          content: language === 'mr'
+          content: res.message || (language === 'mr'
             ? 'कृषि मित्र AI सेवा अद्याप सक्रिय नाही. थेट मराठीत मार्गदर्शन मिळवण्यासाठी कृपया सर्व्हरवर GEMINI_API_KEY कॉन्फिगर करा. झिरो फेक डेटा धोरणानुसार बनावट उत्तरे दिली जात नाहीत.'
             : language === 'hi'
             ? 'कृषि मित्र AI सेवा अभी कॉन्फ़िगर नहीं है। लाइव हिंदी परामर्श के लिए कृपया सर्वर में GEMINI_API_KEY सेट करें। जीरो फेक डेटा नीति के तहत बनावटी उत्तर नहीं दिए जाते हैं।'
-            : 'Krishi Mitra AI conversational service is not configured. Please set GEMINI_API_KEY in server/.env to enable genuine AI answers. Under our Zero Fake Data policy, simulated responses are prohibited.',
+            : 'Krishi Mitra AI conversational service is not configured. Please set GEMINI_API_KEY in server/.env to enable genuine AI answers. Under our Zero Fake Data policy, simulated responses are prohibited.'),
           isError: true
         };
         setMessages((prev) => [...prev, unconfiguredMsg]);
